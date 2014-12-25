@@ -46,7 +46,7 @@ object Async {
       case other =>
         other.foreach {
           case expr @ q"$obj.use[$t]($tree)" =>
-            c.error(expr.pos, "'use' should only be used with the form 'val $ident = use($expr)'")
+            c.error(expr.pos, "'use' should only be used with the form 'val <ident> = use(<expr>)'")
           case _ =>
         }
         false
