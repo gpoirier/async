@@ -7,7 +7,7 @@ import scala.reflect.runtime.universe._
 
 object Async {
 
-  private val clazz = Async.getClass.getName
+  private val obj = tq"Async"
 
   def zip[A, B](fa: Future[A], fb: Future[B])(implicit ec: ExecutionContext): Future[(A, B)] = {
     val promise = Promise[((A, B))]()
@@ -42,10 +42,10 @@ object Async {
     val x = c.untypecheck(block)
 
     val (declarations, tail) = x.children partition {
-      case q"val $ident = $clazz.use[$t]($tree)" => true
+      case q"val $ident = $obj.use[$t]($tree)" => true
       case other =>
         other.foreach {
-          case expr @ q"$clazz.use[$t]($tree)" =>
+          case expr @ q"$obj.use[$t]($tree)" =>
             c.error(expr.pos, "'use' should only be used with the form 'val $ident = use($expr)'")
           case _ =>
         }
@@ -53,13 +53,13 @@ object Async {
     }
 
     val (zipArgs, caseArgs) = (for {
-      q"val $ident = $clazz.use[$t]($tree)" <- declarations
+      q"val $ident = $obj.use[$t]($tree)" <- declarations
     } yield {
       (tree, pq"$ident @ (_: $t)")
     }).unzip
 
     q"""
-      zip(..$zipArgs)($ec).map { case (..$caseArgs) =>
+      github.gpoirier.Async.zip(..$zipArgs)($ec).map { case (..$caseArgs) =>
         ..$tail
       }
     """
