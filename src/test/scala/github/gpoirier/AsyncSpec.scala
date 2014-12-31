@@ -1,18 +1,44 @@
 package github.gpoirier {
 
+  import java.util.concurrent.{Executors, CountDownLatch}
   import scala.concurrent._
   import duration._
-  import ExecutionContext.Implicits.global
 
   import org.scalatest.{Matchers, FlatSpec}
 
-  object AsyncSpec {
+  object AsyncSpec extends Matchers {
+
+    implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
 
     class TestFailure extends Exception
 
-    def sleeper[T](duration: Duration)(result: => T): Future[T] = Future {
-      Thread.sleep(duration.toMillis)
-      result
+    class AsyncFixture(count: Int) {
+
+      val failureTimeout = 10.millis
+      val successTimeout = 10.millis
+
+      val latch = new CountDownLatch(count)
+
+      def blockedFuture[T](result: => T): Future[T] = Future {
+        latch.await(1, SECONDS)
+        result
+      }
+
+      def countDownFuture[T](result: => T): Future[T] = Future {
+        latch.countDown()
+        latch.await(1, SECONDS)
+        result
+      }
+
+      def successValue[T](f: Future[T]): T =
+        try {
+          Await.result(f, successTimeout)
+        } catch {
+          case e: TimeoutException => fail(e)
+        }
+
+      def assertBlocked[T](f: Future[T]): Unit =
+        a[TimeoutException] should be thrownBy Await.result(f, failureTimeout)
     }
   }
 
@@ -20,59 +46,80 @@ package github.gpoirier {
 
     import AsyncSpec._
 
-    "for-comprehension" should "fail to start futures in parallel" in {
+    "for-comprehension" should "fail to start futures in parallel" in new AsyncFixture(1) {
       val result = for {
-        a <- sleeper(100.millis)(10)
-        b <- sleeper(100.millis)(20)
+        a <- blockedFuture(10)
+        b <- countDownFuture(20)
         x = a + b
-        c <- sleeper(100.millis)(30)
+        c <- blockedFuture(30)
       } yield {
         x + c
       }
 
       // For comprehensions will not create futures until the previous one completed
-      a[TimeoutException] should be thrownBy Await.result(result, 280.millis)
+      assertBlocked(result)
     }
 
-    "async" should "starts futures in parallel" in {
+    "pre-started futures in for-comprehension" should "start futures in parallel" in new AsyncFixture(1) {
+      val fa = blockedFuture(10)
+      val fb = countDownFuture(20)
+      val fc = blockedFuture(30)
+      val result = for {
+        a <- fa
+        b <- fb
+        x = a + b
+        c <- fc
+      } yield {
+        x + c
+      }
+
+      successValue(result) shouldBe 60
+    }
+
+    it should "not fail fast" in new AsyncFixture(1) {
+      val fa = blockedFuture(10)
+      val fb = Future[Int](throw new TestFailure)
+      val fc = blockedFuture(30)
+      val result = for {
+        a <- fa
+        b <- fb
+        x = a + b
+        c <- fc
+      } yield {
+        x + c
+      }
+
+      assertBlocked(result)
+    }
+
+    "async" should "starts futures in parallel" in new AsyncFixture(1) {
 
       import Async._
 
       val result = async {
-        val a = use(sleeper(100.millis)(10))
-        val b = use(sleeper(100.millis)(20))
+        val a = use(blockedFuture(10))
+        val b = use(countDownFuture(20))
         val x = a + b
 
-        val c = use(sleeper(100.millis)(30))
+        val c = use(blockedFuture(30))
         x + c
       }
 
-      // If the futures are created in parallel,
-      // they'll take more than 300 milliseconds
-      // to create and fail this test
-      try {
-        Await.result(result, 280.millis) shouldBe 60
-      } catch {
-        case e: TimeoutException => fail(e)
-      }
+      successValue(result) shouldBe 60
     }
 
-    it should "not wait for all futures if one failed" in {
-      import Async.{async, use}
+    it should "fail fast" in new AsyncFixture(1) {
+      import Async.{ async, use }
 
       val result = async {
-        val a = use(sleeper(100.millis)(10))
-        val b = use(sleeper[Int](1.millis)(throw new TestFailure))
-        val c = use(sleeper(100.millis)(30))
+        val a = use(blockedFuture(10))
+        val b = use(Future[Int](throw new TestFailure))
+        val c = use(blockedFuture(30))
 
         a + b + c
       }
 
-      try {
-        a[TestFailure] should be thrownBy Await.result(result, 50.millis)
-      } catch {
-        case e: TimeoutException => fail(e)
-      }
+      a[TestFailure] should be thrownBy successValue(result)
     }
 
   }
@@ -85,37 +132,26 @@ package github.gpoirier {
 // the same package or not.
 package github.gpoirier.otherpackage {
 
-  import scala.concurrent._
-  import duration._
-  import ExecutionContext.Implicits.global
-
   import org.scalatest.{Matchers, FlatSpec}
 
   class OtherPackageAsyncSpec extends FlatSpec with Matchers  {
 
     import github.gpoirier.AsyncSpec._
 
-    "async" should "starts futures in parallel" in {
+    "async" should "starts futures in parallel" in new AsyncFixture(1) {
 
-      import github.gpoirier.Async._
+      import github.gpoirier.Async.{ async, use }
 
       val result = async {
-        val a = use(sleeper(100.millis)(10))
-        val b = use(sleeper(100.millis)(20))
+        val a = use(blockedFuture(10))
+        val b = use(countDownFuture(20))
         val x = a + b
 
-        val c = use(sleeper(100.millis)(30))
+        val c = use(blockedFuture(30))
         x + c
       }
 
-      // If the futures are created in parallel,
-      // they'll take more than 300 milliseconds
-      // to create and fail this test
-      try {
-        Await.result(result, 280.millis) shouldBe 60
-      } catch {
-        case e: TimeoutException => fail(e)
-      }
+      successValue(result) shouldBe 60
     }
   }
 }
