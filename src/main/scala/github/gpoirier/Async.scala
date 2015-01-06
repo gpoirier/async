@@ -1,6 +1,6 @@
 package github.gpoirier
 
-import scala.concurrent.{ExecutionContext, Promise, Future}
+import scala.concurrent.{ExecutionContext, Future}
 import language.experimental.macros
 import reflect.macros.blackbox.Context
 import scala.reflect.runtime.universe._
@@ -8,31 +8,6 @@ import scala.reflect.runtime.universe._
 object Async {
 
   private val obj = tq"Async"
-
-  def zip[A, B](fa: Future[A], fb: Future[B])(implicit ec: ExecutionContext): Future[(A, B)] = {
-    val promise = Promise[((A, B))]()
-    promise.tryCompleteWith(fa zip fb)
-    List(fa, fb) foreach { _.onFailure { case e => promise.failure(e) } }
-
-    promise.future
-  }
-
-  def zip[A, B, C](fa: Future[A], fb: Future[B], fc: Future[C])(implicit ec: ExecutionContext): Future[(A, B, C)] = {
-    val promise = Promise[((A, B), C)]()
-    promise.tryCompleteWith(fa zip fb zip fc)
-    List(fa, fb, fc) foreach { _.onFailure { case e => promise.failure(e) } }
-
-    promise.future.map { case ((a, b), c) => (a, b, c) }
-  }
-
-  def zip[A, B, C, D](fa: Future[A], fb: Future[B], fc: Future[C], fd: Future[D])
-                     (implicit ec: ExecutionContext): Future[(A, B, C, D)] = {
-    val promise = Promise[(((A, B), C), D)]()
-    promise.tryCompleteWith(fa zip fb zip fc zip fd)
-    List(fa, fb, fc, fd) foreach { _.onFailure { case e => promise.failure(e) } }
-
-    promise.future.map { case (((a, b), c), d) => (a, b, c, d) }
-  }
 
   def async[T](block: =>T)(implicit ec: ExecutionContext): Future[T] = macro asyncImpl
 
@@ -42,7 +17,7 @@ object Async {
     val x = c.untypecheck(block)
 
     val (declarations, tail) = x.children partition {
-      case q"val $ident = $obj.use[$t]($tree)" => true
+      case q"val $ident: $t1 = $obj.use[$t2]($tree)" => true
       case other =>
         other.foreach {
           case expr @ q"$obj.use[$t]($tree)" =>
@@ -52,19 +27,61 @@ object Async {
         false
     }
 
-    val (zipArgs, caseArgs) = (for {
-      q"val $ident = $obj.use[$t]($tree)" <- declarations
-    } yield {
-      (tree, pq"$ident @ (_: $t)")
-    }).unzip
+    case class Line(
+        futureTerm: TermName,
+        valueTerm: TermName,
+        ident: TermName,
+        t: c.Tree,
+        tree: c.Tree)
 
-    q"""
-      github.gpoirier.Async.zip(..$zipArgs)($ec).map { case (..$caseArgs) =>
+    val lines = for {
+      (q"val $ident: $t1 = $obj.use[$t2]($tree)", index) <- declarations.zipWithIndex
+    } yield {
+      val t = if (t1.nonEmpty) t1 else t2
+      Line(
+        TermName("f" + (index + 1)),
+        TermName("v" + (index + 1)),
+        ident, t, tree)
+    }
+
+    val inits = for (line <- lines) yield {
+      import line._
+      q"val $futureTerm = $tree"
+    }
+
+    val types = for (line <- lines) yield line.t
+
+    val onFailures =  for (line <- lines) yield {
+      import line._
+      q"$futureTerm onFailure { case e => promise.failure(e) }"
+    }
+
+    val forElements =  for (line <- lines) yield {
+      import line._
+      fq"$valueTerm <- $futureTerm"
+    }
+
+    val yieldElements =  for (line <- lines) yield line.valueTerm
+
+    val caseArgs =  for (line <- lines) yield {
+      import line._
+      pq"$ident @ (_: $t)"
+    }
+
+   q"""
+      {
+        ..$inits
+        val promise = scala.concurrent.Promise[(..$types)]()
+        ..$onFailures
+        promise.tryCompleteWith(for(
+          ..$forElements
+        ) yield (..$yieldElements))
+        promise.future
+      }.map({ case (..$caseArgs) =>
         ..$tail
-      }
+      })($ec)
     """
   }
 
   def use[T](f: Future[T]): T = ???
-
 }
