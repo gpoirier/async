@@ -56,11 +56,6 @@ object Async {
       q"$futureTerm onFailure { case e => promise.failure(e) }"
     }
 
-    val forElements =  for (line <- lines) yield {
-      import line._
-      fq"$valueTerm <- $futureTerm"
-    }
-
     val yieldElements =  for (line <- lines) yield line.valueTerm
 
     val caseArgs =  for (line <- lines) yield {
@@ -68,14 +63,17 @@ object Async {
       pq"$ident @ (_: $t)"
     }
 
+    val future = lines.foldRight(q"scala.concurrent.Future.successful((..$yieldElements))") { (line, acc) =>
+      import line._
+      q"$futureTerm.flatMap { case $valueTerm => $acc }($ec)"
+    }
+
    q"""
       {
         ..$inits
         val promise = scala.concurrent.Promise[(..$types)]()
         ..$onFailures
-        promise.tryCompleteWith(for(
-          ..$forElements
-        ) yield (..$yieldElements))
+        promise.tryCompleteWith($future)
         promise.future
       }.map({ case (..$caseArgs) =>
         ..$tail
