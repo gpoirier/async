@@ -2,13 +2,16 @@ package github.gpoirier
 
 import language.experimental.macros
 import reflect.macros.blackbox.Context
+import scala.concurrent.{Future, ExecutionContext}
 import scala.reflect.runtime.universe._
 
 object Applicatives {
 
   private val obj = tq"Applicatives"
 
-  def applicatives[F[_], A](block: =>A)(implicit F: Applicative[F]): F[A] = macro applicativesImpl
+  def use[F[_], T](f: F[T]): T = ???
+
+  def mapN[F[_], A](block: =>A)(implicit F: Applicative[F]): F[A] = macro applicativesImpl
 
   def applicativesImpl(c: Context)(block: c.Tree)(F: c.Tree) = {
     import c.universe._
@@ -54,9 +57,6 @@ object Applicatives {
       }
     """
   }
-
-  def use[F[_], T](f: F[T]): T = ???
-
 }
 
 
@@ -69,4 +69,9 @@ trait Applicative[F[_]] {
       case ((a, b), c) => f(a, b, c)
     }
   }
+}
+
+object Applicative {
+  implicit def futureApplicative(implicit ec: ExecutionContext): Applicative[Future] =
+    new FailFastFutureApplicative
 }

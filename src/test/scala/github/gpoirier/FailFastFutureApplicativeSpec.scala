@@ -6,7 +6,7 @@ package github.gpoirier {
 
   import org.scalatest.{Matchers, FlatSpec}
 
-  object AsyncSpec extends Matchers {
+  object FailFastFutureApplicativeSpec extends Matchers {
 
     implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
 
@@ -42,9 +42,9 @@ package github.gpoirier {
     }
   }
 
-  class AsyncSpec extends FlatSpec with Matchers {
+  class FailFastFutureApplicativeSpec extends FlatSpec with Matchers {
 
-    import AsyncSpec._
+    import FailFastFutureApplicativeSpec._
 
     "for-comprehension" should "fail to start futures in parallel" in new AsyncFixture(1) {
       val result = for {
@@ -94,9 +94,9 @@ package github.gpoirier {
 
     "async" should "starts futures in parallel" in new AsyncFixture(1) {
 
-      import Async._
+      import Applicatives._
 
-      val result = async {
+      val result = mapN {
         val a = use(blockedFuture(10))
         val b = use(countDownFuture(20))
         val x = a + b
@@ -109,9 +109,9 @@ package github.gpoirier {
     }
 
     it should "fail fast" in new AsyncFixture(1) {
-      import Async.{ async, use }
+      import Applicatives.{ mapN, use }
 
-      val result = async {
+      val result = mapN {
         val a = use(blockedFuture(10))
         val b = use(Future[Int](throw new TestFailure))
         val c = use(blockedFuture(30))
@@ -134,15 +134,15 @@ package github.gpoirier.otherpackage {
 
   import org.scalatest.{Matchers, FlatSpec}
 
-  class OtherPackageAsyncSpec extends FlatSpec with Matchers  {
+  class OtherFailFastFutureApplicativeSpec extends FlatSpec with Matchers  {
 
-    import github.gpoirier.AsyncSpec._
+    import github.gpoirier.FailFastFutureApplicativeSpec._
 
     "async" should "starts futures in parallel" in new AsyncFixture(1) {
 
-      import github.gpoirier.Async.{ async, use }
+      import github.gpoirier.Applicatives.{ mapN, use }
 
-      val result = async {
+      val result = mapN {
         val a = use(blockedFuture(10))
         val b = use(countDownFuture(20))
         val x = a + b
