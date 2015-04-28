@@ -29,6 +29,9 @@ object Applicatives {
         false
     }
 
+    if (declarations.isEmpty)
+      c.error(block.pos, "'applicatives' block should contain 'use' expressions, none found.")
+
     case class Line(
         ident: TermName,
         t: c.Tree,
