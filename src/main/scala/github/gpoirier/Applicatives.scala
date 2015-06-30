@@ -64,6 +64,12 @@ object Applicatives {
 
 
 trait Applicative[F[_]] {
+
+//  def merge[A, B](fa: F[A], fb: F[B]): F[(A, B)] = map2(fa, fb)((_, _))
+//  def map[A, B](fa: F[A])(f: A => B): F[B] = map2(fa, fa) {
+//    (a, _) => f(a)
+//  }
+
   def map2[A, B, C](fa: F[A], fb: F[B])(f: (A, B) => C): F[C]
 
   def map3[A, B, C, D](fa: F[A], fb: F[B], fc: F[C])(f: (A, B, C) => D): F[D] = {
@@ -72,6 +78,32 @@ trait Applicative[F[_]] {
       case ((a, b), c) => f(a, b, c)
     }
   }
+
+  def test[A, B, C] = {
+    def f1: F[A] = ???
+    def f2: F[B] = ???
+    def f3: F[C] = ???
+//
+//    map(merge(f1, merge(f2, f3))) {
+//      case (a, (b, c)) => (a, b, c)
+//    }
+//
+    def id[A, B](a: A, b: B) = a -> b
+//
+//
+//
+    val x = map2(f1, map2(f2, f3)(id)) {
+      case (a, (b, c)) => (a, b, c)
+    }
+
+    val y = (1, (2, 4))
+
+    def f: (A, B) => C = ???
+
+
+  }
+//  }
+
 }
 
 object Applicative {
