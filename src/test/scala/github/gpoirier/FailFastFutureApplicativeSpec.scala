@@ -155,21 +155,3 @@ package github.gpoirier.otherpackage {
     }
   }
 }
-
-package github.gpoirier.test {
-  import scala.concurrent._
-  import ExecutionContext.Implicits.global
-  import github.gpoirier.Applicatives._
-
-  object Test {
-    def test: Future[Int] = {
-      mapN {
-        val a = use(Future.successful(10))
-        val b = use(Future.successful(14))
-        val c = use(Future.successful(20))
-
-        a + b + c
-      }
-    }
-  }
-}

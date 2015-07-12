@@ -30,7 +30,9 @@ object Applicatives {
     }
 
     if (declarations.isEmpty)
-      c.error(block.pos, "'applicatives' block should contain 'use' expressions, none found.")
+      c.abort(block.pos, "'applicatives' block should contain 'use' expressions, none found.")
+    else if (declarations.length == 1)
+      c.abort(block.pos, "'applicatives' block should contain more than one 'use' expressions.")
 
     case class Line(
         ident: TermName,
@@ -54,28 +56,21 @@ object Applicatives {
 
     val f = TermName("Applicative$F")
 
-    val merged = fs.reduceLeft { (left, right) =>
+    val init = fs.init.reduceLeft { (left, right) =>
       q""" $f.map2($left, $right) { (left, right) => _root_.github.gpoirier.Tuples.merge(left, right) } """
     }
     q"""
       val $f = $F
-      $f.map($merged)({ (..$args) =>
+      $f.map2($init, ${fs.last})((left$$, right$$) => ({ (..$args) =>
         ..$tail
-      }.tupled)
+      }.tupled(_root_.github.gpoirier.Tuples.merge(left$$, right$$))))
     """
   }
 }
 
 
 trait Applicative[F[_]] {
-
-  def unit[A](a: A): F[A]
-
   def map2[A, B, C](fa: F[A], fb: F[B])(f: (A, B) => C): F[C]
-
-  def map[A, B](fa: F[A])(f: A => B): F[B] =
-    map2(fa, unit(())) { (a, _) => f(a) }
-
 }
 
 object Applicative {

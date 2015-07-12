@@ -5,9 +5,6 @@ import org.scalatest._
 class ApplicativesSpec extends FreeSpec {
 
   implicit val _ = new Applicative[Option] {
-
-    override def unit[A](a: A): Option[A] = Some(a)
-
     override def map2[A, B, C](fa: Option[A], fb: Option[B])(f: (A, B) => C): Option[C] = {
       for {
         a <- fa

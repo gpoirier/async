@@ -36,7 +36,4 @@ object Tuples {
     q"(..${left ++ right})"
   }
 
-  def untuple[A, B, C, D](tuple: (A, B, C))(f: (A, B, C) => D) = tuple match {
-    case (a, b, c) => f(a, b, c)
-  }
 }
