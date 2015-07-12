@@ -1,17 +1,21 @@
-package github.gpoirier
+package github.gpoirier.mapn
 
 import language.experimental.macros
 import reflect.macros.blackbox.Context
 import scala.concurrent.{Future, ExecutionContext}
 import scala.reflect.runtime.universe._
 
-object Applicatives {
-
-  private val obj = tq"Applicatives"
+trait Applicatives {
 
   def use[F[_], T](f: F[T]): T = ???
 
-  def mapN[F[_], A](block: =>A)(implicit F: Applicative[F]): F[A] = macro applicativesImpl
+  def mapN[F[_], A](block: =>A)(implicit F: ApplicativeLike[F]): F[A] = macro Applicatives.applicativesImpl
+
+}
+
+object Applicatives extends Applicatives {
+
+  private val obj = tq"Applicatives"
 
   def applicativesImpl(c: Context)(block: c.Tree)(F: c.Tree) = {
     import c.universe._
@@ -55,7 +59,7 @@ object Applicatives {
     }
 
     val f = TermName("Applicative$F")
-    val merge = q"_root_.github.gpoirier.Tuples.merge"
+    val merge = q"${weakTypeOf[Tuples.type]}.merge"
 
     val init = fs.init.reduceLeft { (left, right) =>
       q""" $f.map2($left, $right) { (left, right) => $merge(left, right) } """
@@ -67,14 +71,4 @@ object Applicatives {
       }.tupled($merge(left$$, right$$))))
     """
   }
-}
-
-
-trait Applicative[F[_]] {
-  def map2[A, B, C](fa: F[A], fb: F[B])(f: (A, B) => C): F[C]
-}
-
-object Applicative {
-  implicit def futureApplicative(implicit ec: ExecutionContext): Applicative[Future] =
-    new FailFastFutureApplicative
 }

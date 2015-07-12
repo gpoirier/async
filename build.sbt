@@ -1,10 +1,10 @@
-name := "async"
+name := "mapN"
 
 version := "1.0"
 
 scalaVersion := "2.11.1"
 
-libraryDependencies += "org.scalatest" %% "scalatest" % "2.1.6" % "test"
+libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.5" % "test"
 
 libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
 

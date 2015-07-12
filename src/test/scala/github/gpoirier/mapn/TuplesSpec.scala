@@ -1,4 +1,4 @@
-package github.gpoirier
+package github.gpoirier.mapn
 
 import org.scalatest._
 
