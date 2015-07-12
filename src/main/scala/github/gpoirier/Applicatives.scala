@@ -49,29 +49,33 @@ object Applicatives {
     val idents = for (line <- lines) yield line.ident
 
     val args = (idents zip types) map { case (ident, t) =>
-      q"$ident: $t"
+      q"$ident: $t": c.Tree
     }
 
-    val mapN = TermName("map" + lines.size)
+    val f = TermName("Applicative$F")
 
+    val merged = fs.reduceLeft { (left, right) =>
+      q""" $f.map2($left, $right) { (left, right) => _root_.github.gpoirier.Tuples.merge(left, right) } """
+    }
     q"""
-      $F.$mapN(..$fs) { (..$args) =>
+      val $f = $F
+      $f.map($merged)({ (..$args) =>
         ..$tail
-      }
+      }.tupled)
     """
   }
 }
 
 
 trait Applicative[F[_]] {
+
+  def unit[A](a: A): F[A]
+
   def map2[A, B, C](fa: F[A], fb: F[B])(f: (A, B) => C): F[C]
 
-  def map3[A, B, C, D](fa: F[A], fb: F[B], fc: F[C])(f: (A, B, C) => D): F[D] = {
-    val fab = map2(fa, fb) { (a, b) => (a, b) }
-    map2(fab, fc) {
-      case ((a, b), c) => f(a, b, c)
-    }
-  }
+  def map[A, B](fa: F[A])(f: A => B): F[B] =
+    map2(fa, unit(())) { (a, _) => f(a) }
+
 }
 
 object Applicative {
