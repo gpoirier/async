@@ -55,15 +55,16 @@ object Applicatives {
     }
 
     val f = TermName("Applicative$F")
+    val merge = q"_root_.github.gpoirier.Tuples.merge"
 
     val init = fs.init.reduceLeft { (left, right) =>
-      q""" $f.map2($left, $right) { (left, right) => _root_.github.gpoirier.Tuples.merge(left, right) } """
+      q""" $f.map2($left, $right) { (left, right) => $merge(left, right) } """
     }
     q"""
       val $f = $F
       $f.map2($init, ${fs.last})((left$$, right$$) => ({ (..$args) =>
         ..$tail
-      }.tupled(_root_.github.gpoirier.Tuples.merge(left$$, right$$))))
+      }.tupled($merge(left$$, right$$))))
     """
   }
 }
