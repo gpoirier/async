@@ -2,6 +2,8 @@ package github.gpoirier.mapn
 
 import org.scalatest._
 
+import scala.concurrent.ExecutionContext
+
 object ApplicativesSpec {
   implicit val optionApplicative = new ApplicativeLike[Option] {
     override def map2[A, B, C](fa: Option[A], fb: Option[B])(f: (A, B) => C): Option[C] = {
@@ -22,7 +24,7 @@ class ApplicativesSpec extends FlatSpec with Matchers {
   "mapN" should "support combining only two elements" in {
     val n = mapN {
       val a = use(Some(1))
-      val b = use(Some(2))
+      val b = use(Option(2))
 
       a + b
     }
@@ -32,7 +34,7 @@ class ApplicativesSpec extends FlatSpec with Matchers {
 
   it should "support a large number of elements" in {
     val n = mapN {
-      val a = use(Some(1))
+      val a = use(Option(1))
       val b = use(Some(2))
       val c = use(Some(3))
       val d = use(Some(4))
